@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Чат → Google Sheets</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 16px; background: #f9f9f9; }
+    .container { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    h1 { margin-top: 0; font-size: 1.5rem; }
+    label { display: block; font-size: 0.9rem; color: #333; margin-bottom: 4px; }
+    input, textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 16px; }
+    textarea { min-height: 100px; resize: vertical; }
+    button { width: 100%; padding: 12px; border: none; border-radius: 8px; background: #0f9d58; color: #fff; font-size: 1rem; font-weight: bold; cursor: pointer; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    #status { margin-top: 16px; text-align: center; font-size: 0.9rem; }
+    #status.ok { color: #0f9d58; }
+    #status.err { color: #d93025; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Чат в Google Sheets</h1>
+    
+    <label for="nick">Ваш ник</label>
+    <input id="nick" type="text" placeholder="Например, Веля" maxlength="40">
+
+    <label for="message">Сообщение</label>
+    <textarea id="message" placeholder="Введите сообщение..."></textarea>
+
+    <button id="send">Отправить</button>
+    <div id="status"></div>
+  </div>
+
+  <script>
+    // ⚠️ Вставьте сюда URL вашего веб-приложения
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbxCaQiZyl3WkyezYh91knw08Chn1ROXGp0scQlePb5FxR5aIdo_yKv5QXuTi8paE3ru/exec';
+
+    const nickInput = document.getElementById('nick');
+    const msgInput = document.getElementById('message');
+    const sendBtn = document.getElementById('send');
+    const statusEl = document.getElementById('status');
+
+    // Восстанавливаем ник из localStorage
+    nickInput.value = localStorage.getItem('chat_nick') || '';
+    nickInput.addEventListener('input', () => localStorage.setItem('chat_nick', nickInput.value));
+
+    function setStatus(text, type) {
+      statusEl.textContent = text;
+      statusEl.className = type || '';
+    }
+
+    sendBtn.addEventListener('click', async () => {
+      const nick = nickInput.value.trim() || 'Аноним';
+      const message = msgInput.value.trim();
+
+      if (!message) {
+        setStatus('Введите сообщение.', 'err');
+        return;
+      }
+
+      sendBtn.disabled = true;
+      setStatus('Отправка...', '');
+
+      try {
+        const body = new URLSearchParams();
+        body.append('nick', nick);
+        body.append('message', message);
+
+        const response = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString()
+        });
+
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+
+        setStatus('Сообщение сохранено в таблице!', 'ok');
+        msgInput.value = '';
+        msgInput.focus();
+
+      } catch (error) {
+        // Даже при ошибке CORS (если браузер заблокировал чтение ответа) 
+        // данные, скорее всего, уже отправлены и сохранены в таблице.
+        setStatus('Запрос отправлен. Проверьте таблицу: сообщение, вероятно, добавлено.', 'err');
+        msgInput.value = '';
+      } finally {
+        sendBtn.disabled = false;
+      }
+    });
+
+    // Отправка по Ctrl+Enter
+    msgInput.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') sendBtn.click();
+    });
+  </script>
+</body>
+</html>
